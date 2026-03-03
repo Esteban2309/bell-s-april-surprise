@@ -7,26 +7,34 @@ interface GiftBoxProps {
   gift: Gift;
   isAvailable: boolean;
   isToday: boolean;
+  isOpened: boolean;
+  canOpenToday: boolean;
+  onOpen: (day: number) => void;
 }
 
-const GiftBox = ({ day, gift, isAvailable, isToday }: GiftBoxProps) => {
-  const [isOpened, setIsOpened] = useState(false);
+const GiftBox = ({ day, gift, isAvailable, isToday, isOpened, canOpenToday, onOpen }: GiftBoxProps) => {
   const [isShaking, setIsShaking] = useState(false);
+  const [showContent, setShowContent] = useState(false);
 
   const handleClick = () => {
     if (!isAvailable) return;
+
     if (isOpened) {
-      setIsOpened(false);
+      setShowContent(!showContent);
       return;
     }
+
+    if (!canOpenToday) return;
+
     setIsShaking(true);
     setTimeout(() => {
       setIsShaking(false);
-      setIsOpened(true);
+      setShowContent(true);
+      onOpen(day);
     }, 500);
   };
 
-  if (isOpened) {
+  if (showContent && isOpened) {
     return (
       <button
         onClick={handleClick}
@@ -39,29 +47,43 @@ const GiftBox = ({ day, gift, isAvailable, isToday }: GiftBoxProps) => {
     );
   }
 
+  // Opened but collapsed — show a "revealed" style
+  if (isOpened && !showContent) {
+    return (
+      <button
+        onClick={handleClick}
+        className="relative flex flex-col items-center justify-center rounded-lg border border-primary/20 bg-gift-opened/50 min-h-[120px] sm:min-h-[140px] cursor-pointer transition-all hover:border-primary/40"
+      >
+        <span className="text-lg sm:text-2xl mb-1">{gift.emoji}</span>
+        <span className="text-lg font-bold text-primary/70">{day}</span>
+        <span className="text-[9px] text-muted-foreground">ya abierto ✓</span>
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={handleClick}
-      disabled={!isAvailable}
+      disabled={!isAvailable || !canOpenToday}
       className={`
         relative flex flex-col items-center justify-center rounded-lg border min-h-[120px] sm:min-h-[140px] transition-all duration-300
         ${isShaking ? "animate-gift-shake" : ""}
-        ${isToday ? "border-primary bg-gift-available shadow-[0_0_20px_hsl(var(--gift-glow)/0.3)] animate-float" : ""}
-        ${isAvailable && !isToday ? "border-primary/20 bg-gift-available cursor-pointer hover:border-primary/50 hover:shadow-[0_0_15px_hsl(var(--gift-glow)/0.2)]" : ""}
-        ${!isAvailable ? "border-border/30 bg-gift-locked cursor-not-allowed opacity-50" : ""}
+        ${isToday && canOpenToday ? "border-primary bg-gift-available shadow-[0_0_20px_hsl(var(--gift-glow)/0.3)] animate-float" : ""}
+        ${isAvailable && canOpenToday && !isToday ? "border-primary/20 bg-gift-available cursor-pointer hover:border-primary/50 hover:shadow-[0_0_15px_hsl(var(--gift-glow)/0.2)]" : ""}
+        ${!isAvailable || !canOpenToday ? "border-border/30 bg-gift-locked cursor-not-allowed opacity-50" : ""}
       `}
     >
       <span className="text-lg sm:text-2xl mb-1">
-        {isAvailable ? (
+        {isAvailable && canOpenToday ? (
           <GiftIcon className="w-6 h-6 text-primary" />
         ) : (
           <Lock className="w-5 h-5 text-muted-foreground" />
         )}
       </span>
-      <span className={`text-lg font-bold ${isAvailable ? "text-primary" : "text-muted-foreground"}`}>
+      <span className={`text-lg font-bold ${isAvailable && canOpenToday ? "text-primary" : "text-muted-foreground"}`}>
         {day}
       </span>
-      {isToday && (
+      {isToday && canOpenToday && (
         <span className="absolute -top-1 -right-1">
           <Heart className="w-4 h-4 text-primary fill-primary animate-sparkle" />
         </span>

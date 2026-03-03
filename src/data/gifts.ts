@@ -8,8 +8,8 @@ export interface Gift {
 // Gifts for days 1 and 8 are FIXED (index 0 and 7)
 // The rest get shuffled randomly per user session but consistently via seed
 const allGifts: Gift[] = [
-  // Day 1 - FIXED
-  { id: 1, title: "Para mi Bell 🎀", message: "Este mes es especial porque cada día tiene una sorpresa para ti. Te quiero muchísimo. ¡Feliz abril! 💕", emoji: "💌" },
+  // Day 1 - FIXED (Cumpleaños)
+  { id: 1, title: "¡Feliz Cumpleaños Bell! 🎂", message: "¡Hoy es TU día! La persona más increíble del mundo cumple años y yo soy la más afortunada por tenerte. Que este año te traiga todo lo que mereces (que es TODO). ¡Te amo, Bell! 🎀🎂💕", emoji: "🎂" },
   // Day 2-7 (will be shuffled into random slots)
   { id: 2, title: "Playlist secreta 🎵", message: "Hoy te dedico una canción de Billie Eilish. Escucha 'Ocean Eyes' pensando en mí 💙", emoji: "🎧" },
   { id: 3, title: "Abrazo virtual 🤗", message: "Imagina que te estoy abrazando ahora mismo. Bien fuerte. No te suelto. 🫂", emoji: "🧸" },
@@ -17,8 +17,8 @@ const allGifts: Gift[] = [
   { id: 5, title: "Cupón de película 🎬", message: "Vale por una noche de pelis de Studio Ghibli juntos. Tú eliges cuál 🏰", emoji: "🎬" },
   { id: 6, title: "Stray Kids moment 🐺", message: "Como dice SKZ: 'You make Stray Kids stay'. Tú me haces quedarme siempre 💫", emoji: "⭐" },
   { id: 7, title: "Deseo de estrella ⭐", message: "Hoy pide un deseo. El universo conspira para que se cumpla porque tú lo mereces todo 🌙", emoji: "🌟" },
-  // Day 8 - FIXED
-  { id: 8, title: "Día especial 🎀", message: "Hoy es un día que marco en el calendario. Gracias por existir en mi vida, Bell. Eres lo mejor que me ha pasado 💗", emoji: "💝" },
+  // Day 8 - FIXED (5 meses juntas)
+  { id: 8, title: "¡5 Meses juntas! 💗", message: "Hoy cumplimos 5 meses y cada día a tu lado es mejor que el anterior. Gracias por ser mi persona favorita, Bell. Aquí vamos por muchos más meses, años y toda la vida 💗🎀", emoji: "💝" },
   // Days 9-30
   { id: 9, title: "Gatito para ti 🐱", message: "Si fueras un personaje de Hello Kitty, serías la protagonista porque todo gira alrededor de lo linda que eres 🎀", emoji: "🐱" },
   { id: 10, title: "Carta de amor 💌", message: "Cada día que pasa me enamoro más de ti. No es cursi, es la verdad más honesta que tengo 💕", emoji: "💌" },

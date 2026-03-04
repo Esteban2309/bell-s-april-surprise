@@ -1,38 +1,34 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { getGiftsForApril } from "@/data/gifts";
-import GiftBox from "@/components/GiftBox";
+import { Gift, getAllGifts } from "@/data/gifts";
+import SpinWheel from "@/components/SpinWheel";
 import patternBg from "@/assets/pattern-bg.png";
 import { Heart, Star, Sparkles, Clock } from "lucide-react";
 
-const STORAGE_KEY = "bell-april-gifts";
+const STORAGE_KEY = "bell-april-spins"; // ordered list of gift IDs won
+const LAST_SPIN_KEY = "bell-april-last-spin-date";
 
-interface OpenedGifts {
-  [day: string]: boolean;
-}
-
-function getOpenedGifts(): OpenedGifts {
+function getSpinResults(): number[] {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   } catch {
-    return {};
+    return [];
   }
 }
 
-function saveOpenedGifts(opened: OpenedGifts) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(opened));
+function saveSpinResults(results: number[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
 }
 
-function hasOpenedTodayGift(opened: OpenedGifts, todayInApril: number): boolean {
-  // Check if any gift was opened for today's date
-  // We store which day of april each gift was opened on
-  return Object.keys(opened).some((key) => {
-    const openedDay = Number(key);
-    // For day 1 and 8, they're fixed so check directly
-    return opened[key] && openedDay > 0;
-  });
+function getLastSpinDate(): string {
+  return localStorage.getItem(LAST_SPIN_KEY) || "";
 }
 
-function getTimeUntilMidnight(): { hours: number; minutes: number; seconds: number } {
+function getTodayString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function getTimeUntilMidnight() {
   const now = new Date();
   const midnight = new Date(now);
   midnight.setHours(24, 0, 0, 0);
@@ -44,47 +40,36 @@ function getTimeUntilMidnight(): { hours: number; minutes: number; seconds: numb
   };
 }
 
-// Track which calendar day each gift was opened
-const OPENED_DATE_KEY = "bell-april-opened-date";
-
-interface OpenedDates {
-  [day: string]: string; // day -> "YYYY-MM-DD" when it was opened
-}
-
-function getOpenedDates(): OpenedDates {
-  try {
-    return JSON.parse(localStorage.getItem(OPENED_DATE_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function getTodayString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-function hasOpenedAnyToday(openedDates: OpenedDates): boolean {
-  const today = getTodayString();
-  return Object.values(openedDates).includes(today);
-}
+const pad = (n: number) => String(n).padStart(2, "0");
 
 const Index = () => {
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  const currentDay = now.getDate();
+  const isApril = now.getMonth() === 3;
 
-  const isApril = currentMonth === 3;
-  const todayInApril = isApril ? currentDay : 0;
-
-  const gifts = useMemo(() => getGiftsForApril(currentYear), [currentYear]);
-
-  const [openedGifts, setOpenedGifts] = useState<OpenedGifts>(getOpenedGifts);
-  const [openedDates, setOpenedDates] = useState<OpenedDates>(getOpenedDates);
+  const allGifts = useMemo(() => getAllGifts(), []);
+  const [spinResults, setSpinResults] = useState<number[]>(getSpinResults);
+  const [lastSpinDate, setLastSpinDate] = useState(getLastSpinDate);
   const [countdown, setCountdown] = useState(getTimeUntilMidnight());
 
-  const alreadyOpenedToday = hasOpenedAnyToday(openedDates);
+  const today = getTodayString();
+  const alreadySpunToday = lastSpinDate === today;
+  const spinCount = spinResults.length; // how many spins have been done (1-indexed for next)
+
+  // Determine which gifts are still available on the wheel
+  const availableGifts = useMemo(() => {
+    return allGifts.filter((g) => !spinResults.includes(g.id));
+  }, [allGifts, spinResults]);
+
+  // Determine if a forced gift is needed for next spin
+  const nextSpinNumber = spinCount + 1; // 1-indexed
+  let forcedGiftId: number | null = null;
+  if (nextSpinNumber === 1) forcedGiftId = 1; // Gift 1 on first spin
+  else if (nextSpinNumber === 8) forcedGiftId = 8; // Gift 8 on 8th spin
+
+  // Won gifts for history display
+  const wonGifts = useMemo(() => {
+    return spinResults.map((id) => allGifts.find((g) => g.id === id)!).filter(Boolean);
+  }, [spinResults, allGifts]);
 
   // Countdown timer
   useEffect(() => {
@@ -94,17 +79,17 @@ const Index = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleOpen = useCallback((day: number) => {
-    const newOpened = { ...getOpenedGifts(), [day]: true };
-    saveOpenedGifts(newOpened);
-    setOpenedGifts(newOpened);
+  const canSpin = isApril ? !alreadySpunToday && availableGifts.length > 0 : availableGifts.length > 0;
 
-    const newDates = { ...getOpenedDates(), [day]: getTodayString() };
-    localStorage.setItem(OPENED_DATE_KEY, JSON.stringify(newDates));
-    setOpenedDates(newDates);
+  const handleResult = useCallback((gift: Gift) => {
+    const newResults = [...getSpinResults(), gift.id];
+    saveSpinResults(newResults);
+    setSpinResults(newResults);
+
+    const todayStr = getTodayString();
+    localStorage.setItem(LAST_SPIN_KEY, todayStr);
+    setLastSpinDate(todayStr);
   }, []);
-
-  const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -127,7 +112,7 @@ const Index = () => {
 
       <div className="relative z-10 container max-w-3xl mx-auto px-4 py-8 sm:py-12">
         {/* Header */}
-        <header className="text-center mb-8 sm:mb-12">
+        <header className="text-center mb-8 sm:mb-10">
           <h1 className="font-script text-5xl sm:text-7xl text-primary mb-2">
             Para Bell
           </h1>
@@ -141,81 +126,83 @@ const Index = () => {
           </div>
         </header>
 
-        {/* Countdown / Status */}
+        {/* Status / Countdown */}
         {isApril && (
           <div className="text-center mb-6 rounded-lg border border-primary/20 bg-card p-4">
-            {alreadyOpenedToday ? (
+            {alreadySpunToday ? (
               <>
                 <p className="text-sm text-primary font-semibold mb-2">
-                  🎁 Ya abriste tu regalo de hoy
+                  🎁 Ya giraste la ruleta hoy
                 </p>
                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
                   <Clock className="w-4 h-4" />
                   <p className="text-sm">
-                    Próximo regalo en{" "}
+                    Próximo giro en{" "}
                     <span className="text-primary font-mono font-bold">
                       {pad(countdown.hours)}:{pad(countdown.minutes)}:{pad(countdown.seconds)}
                     </span>
                   </p>
                 </div>
               </>
+            ) : availableGifts.length === 0 ? (
+              <p className="text-sm text-primary font-semibold">
+                🎉 ¡Abriste todos los regalos! Gracias por cada día, Bell 💗
+              </p>
             ) : (
               <p className="text-sm text-primary font-semibold">
-                ✨ ¡Tienes un regalo disponible hoy! Elige uno 🎁
+                ✨ ¡Tienes un giro disponible hoy! 🎀
               </p>
             )}
           </div>
         )}
 
         {!isApril && (
-          <div className="text-center mb-8 rounded-lg border border-primary/20 bg-card p-4">
+          <div className="text-center mb-6 rounded-lg border border-primary/20 bg-card p-4">
             <p className="text-sm text-muted-foreground">
-              🎀 Los regalos se desbloquean en <span className="text-primary font-semibold">abril {currentYear}</span>
+              🎀 La ruleta se activa en <span className="text-primary font-semibold">abril {now.getFullYear()}</span>
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Hoy puedes ver una vista previa — todos los días están disponibles para probar ✨
+              Vista previa — puedes girar sin límite para probar ✨
             </p>
           </div>
         )}
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-5 sm:grid-cols-6 gap-2 sm:gap-3">
-          {gifts.map((gift, index) => {
-            const day = index + 1;
-            const isDayUnlocked = !isApril || day <= todayInApril;
-            const isOpened = !!openedGifts[day];
-
-            // Can open today: day is unlocked, not already opened, and haven't opened another today
-            // Exception: if it's day 1 or 8 and it IS that day, it auto-opens
-            let canOpenToday: boolean;
-            if (!isApril) {
-              canOpenToday = true; // preview mode
-            } else if (isOpened) {
-              canOpenToday = false; // already opened
-            } else if (!isDayUnlocked) {
-              canOpenToday = false;
-            } else if (alreadyOpenedToday) {
-              canOpenToday = false; // already used today's pick
-            } else {
-              canOpenToday = true;
-            }
-
-            const isToday = isApril && day === todayInApril;
-
-            return (
-              <GiftBox
-                key={day}
-                day={day}
-                gift={gift}
-                isAvailable={isDayUnlocked}
-                isToday={isToday}
-                isOpened={isOpened}
-                canOpenToday={canOpenToday}
-                onOpen={handleOpen}
-              />
-            );
-          })}
+        {/* Spin counter */}
+        <div className="text-center mb-6">
+          <span className="text-xs text-muted-foreground">
+            Regalos descubiertos: <span className="text-primary font-bold">{spinCount}</span> / 30
+          </span>
         </div>
+
+        {/* Wheel */}
+        <SpinWheel
+          availableGifts={availableGifts}
+          forcedGiftId={forcedGiftId}
+          onResult={handleResult}
+          disabled={isApril ? !canSpin : false}
+        />
+
+        {/* History of won gifts */}
+        {wonGifts.length > 0 && (
+          <div className="mt-10">
+            <h2 className="text-center text-sm font-semibold text-muted-foreground mb-4">
+              🎁 Regalos descubiertos
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {wonGifts.map((gift, i) => (
+                <div
+                  key={gift.id}
+                  className="rounded-lg border border-primary/20 bg-card p-3 text-center"
+                >
+                  <span className="text-xs text-muted-foreground">Giro #{i + 1}</span>
+                  <span className="text-2xl block my-1">{gift.emoji}</span>
+                  <span className="text-xs font-bold text-primary block">{gift.title}</span>
+                  <span className="text-[10px] text-foreground/70 leading-tight block mt-1">{gift.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <footer className="text-center mt-10 sm:mt-14">

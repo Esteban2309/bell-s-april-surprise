@@ -60,6 +60,10 @@ function seededRandom(seed: number): number {
   return x - Math.floor(x);
 }
 
+export function getAllGifts(): Gift[] {
+  return [...allGifts];
+}
+
 export function getGiftsForApril(year: number = 2026): Gift[] {
   const fixed1 = allGifts[0]; // day 1
   const fixed8 = allGifts[7]; // day 8

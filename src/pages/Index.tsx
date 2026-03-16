@@ -42,6 +42,13 @@ function getTimeUntilMidnight() {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+// Floating emojis that appear progressively as more gifts are unlocked
+const ALL_FLOATING_EMOJIS = [
+  "🌸", "💗", "✨", "🎀", "⭐", "🦋", "🌙", "💎", "🐱", "🎵",
+  "🌷", "💌", "🎪", "👑", "🕊️", "🌿", "💜", "🎶", "🌺", "🧸",
+  "🌟", "💕", "🎂", "🏯", "🎸", "🔮", "🌠", "❤️", "🎭", "🎁",
+];
+
 const Index = () => {
   const now = new Date();
   const isApril = now.getMonth() === 3;
@@ -54,6 +61,7 @@ const Index = () => {
   const today = getTodayString();
   const alreadySpunToday = lastSpinDate === today;
   const spinCount = spinResults.length;
+  const allCompleted = spinCount >= 30;
 
   const availableGifts = useMemo(() => {
     return allGifts.filter((g) => !spinResults.includes(g.id));
@@ -67,6 +75,12 @@ const Index = () => {
   const wonGifts = useMemo(() => {
     return spinResults.map((id) => allGifts.find((g) => g.id === id)!).filter(Boolean);
   }, [spinResults, allGifts]);
+
+  // How many floating emojis to show based on progress
+  const floatingEmojis = useMemo(() => {
+    const count = Math.min(Math.ceil(spinCount * 1), ALL_FLOATING_EMOJIS.length);
+    return ALL_FLOATING_EMOJIS.slice(0, count);
+  }, [spinCount]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -93,6 +107,32 @@ const Index = () => {
         className="fixed inset-0 opacity-[0.03] pointer-events-none"
         style={{ backgroundImage: `url(${patternBg})`, backgroundSize: "200px" }}
       />
+
+      {/* Floating emojis background - more appear as gifts are unlocked */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {floatingEmojis.map((emoji, i) => {
+          const seed1 = ((i * 7 + 3) % 100);
+          const seed2 = ((i * 13 + 7) % 100);
+          const delay = (i * 0.8) % 12;
+          const duration = 6 + (i % 5) * 2;
+          return (
+            <span
+              key={i}
+              className="absolute text-2xl sm:text-3xl select-none animate-float"
+              style={{
+                left: `${seed1}%`,
+                top: `${seed2}%`,
+                opacity: 0.12 + (spinCount / 30) * 0.15,
+                animationDelay: `${delay}s`,
+                animationDuration: `${duration}s`,
+                fontSize: `${1.2 + (i % 3) * 0.4}rem`,
+              }}
+            >
+              {emoji}
+            </span>
+          );
+        })}
+      </div>
 
       {/* Navbar */}
       <nav className="relative z-20 flex items-center justify-between px-6 py-4 border-b border-border/50">
@@ -131,60 +171,104 @@ const Index = () => {
           </div>
 
           {/* Countdown box */}
-          <div className="rounded-xl border border-primary/30 bg-card px-6 py-4 text-center shrink-0">
-            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground mb-2">
-              Próximo regalo en:
-            </p>
-            <div className="flex items-center gap-1">
-              <div className="text-center">
-                <span className="text-3xl font-bold text-foreground font-mono">{pad(countdown.hours)}</span>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Horas</p>
-              </div>
-              <span className="text-2xl font-bold text-primary mx-1">:</span>
-              <div className="text-center">
-                <span className="text-3xl font-bold text-foreground font-mono">{pad(countdown.minutes)}</span>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Mins</p>
-              </div>
-              <span className="text-2xl font-bold text-primary mx-1">:</span>
-              <div className="text-center">
-                <span className="text-3xl font-bold text-foreground font-mono">{pad(countdown.seconds)}</span>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Segs</p>
+          {!allCompleted && (
+            <div className="rounded-xl border border-primary/30 bg-card px-6 py-4 text-center shrink-0">
+              <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground mb-2">
+                Próximo regalo en:
+              </p>
+              <div className="flex items-center gap-1">
+                <div className="text-center">
+                  <span className="text-3xl font-bold text-foreground font-mono">{pad(countdown.hours)}</span>
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Horas</p>
+                </div>
+                <span className="text-2xl font-bold text-primary mx-1">:</span>
+                <div className="text-center">
+                  <span className="text-3xl font-bold text-foreground font-mono">{pad(countdown.minutes)}</span>
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Mins</p>
+                </div>
+                <span className="text-2xl font-bold text-primary mx-1">:</span>
+                <div className="text-center">
+                  <span className="text-3xl font-bold text-foreground font-mono">{pad(countdown.seconds)}</span>
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">Segs</p>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Wheel Section */}
-        <div className="relative flex flex-col items-center mb-12">
-          {/* Decorative icons */}
-          <div className="absolute left-0 sm:left-10 top-10 text-3xl opacity-80 select-none">🐵</div>
-          <div className="absolute right-0 sm:right-10 top-10 text-3xl opacity-80 select-none">🐱</div>
-          <div className="absolute right-4 sm:right-16 bottom-10 text-3xl opacity-80 select-none">🎸</div>
-
-          <SpinWheel
-            availableGifts={availableGifts}
-            forcedGiftId={forcedGiftId}
-            onResult={handleResult}
-            disabled={isApril ? !canSpin : false}
-          />
-
-          {/* Status line */}
-          <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              ⏳ {canSpin ? "1 giro disponible" : "0 giros disponibles"}
-            </span>
-            <span className="text-border">|</span>
-            <span className="flex items-center gap-1">
-              🏅 Rank: Wolf Chan
-            </span>
-          </div>
-
-          {!isApril && (
-            <p className="text-[10px] text-muted-foreground mt-2">
-              Vista previa — puedes girar sin límite para probar ✨
-            </p>
           )}
         </div>
+
+        {/* ALL COMPLETED - Final Message */}
+        {allCompleted ? (
+          <div className="flex flex-col items-center text-center mb-12 animate-reveal">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 rounded-full bg-primary/20 blur-3xl scale-150" />
+              <div className="relative text-8xl sm:text-9xl">💝</div>
+            </div>
+            <h2 className="font-script text-5xl sm:text-7xl text-primary mb-4">
+              ¡Lo lograste, Bell!
+            </h2>
+            <div className="max-w-lg rounded-2xl border-2 border-primary/40 bg-card/80 backdrop-blur-sm p-8 space-y-4">
+              <p className="text-foreground text-base leading-relaxed">
+                Abriste los <span className="text-primary font-bold">30 regalos</span> y cada uno fue un pedacito de todo lo que siento por ti.
+              </p>
+              <p className="text-foreground/80 text-sm leading-relaxed">
+                Este mes fue mágico porque existes tú. Cada estrella, cada canción, cada palabra… todo fue real, todo fue para ti. 
+                Gracias por ser la persona más increíble que conozco. 💕
+              </p>
+              <p className="text-foreground text-base leading-relaxed font-semibold">
+                Abril se acaba, pero lo nuestro no tiene fecha de caducidad. 
+                <span className="text-primary"> Te amo, Bell.</span> Hoy, mañana y siempre. 🎀
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2 text-2xl">
+                🌸 💗 ✨ 🐱 🎵 🦋 🌙 💎
+              </div>
+            </div>
+
+            {/* Celebration sparkles */}
+            <div className="flex gap-3 mt-6">
+              {["🎀", "⭐", "💕", "✨", "🌸"].map((e, i) => (
+                <span
+                  key={i}
+                  className="text-3xl animate-float"
+                  style={{ animationDelay: `${i * 0.4}s` }}
+                >
+                  {e}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* Wheel Section */
+          <div className="relative flex flex-col items-center mb-12">
+            {/* Decorative icons */}
+            <div className="absolute left-0 sm:left-10 top-10 text-3xl opacity-80 select-none">🐵</div>
+            <div className="absolute right-0 sm:right-10 top-10 text-3xl opacity-80 select-none">🐱</div>
+            <div className="absolute right-4 sm:right-16 bottom-10 text-3xl opacity-80 select-none">🎸</div>
+
+            <SpinWheel
+              availableGifts={availableGifts}
+              forcedGiftId={forcedGiftId}
+              onResult={handleResult}
+              disabled={isApril ? !canSpin : false}
+            />
+
+            {/* Status line */}
+            <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                ⏳ {canSpin ? "1 giro disponible" : "0 giros disponibles"}
+              </span>
+              <span className="text-border">|</span>
+              <span className="flex items-center gap-1">
+                🏅 Rank: Wolf Chan
+              </span>
+            </div>
+
+            {!isApril && (
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Vista previa — puedes girar sin límite para probar ✨
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Gift History */}
         <div className="mb-10">

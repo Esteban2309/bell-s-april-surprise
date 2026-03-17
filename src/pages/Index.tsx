@@ -49,18 +49,47 @@ const ALL_FLOATING_EMOJIS = [
   "🌟", "💕", "🎂", "🏯", "🎸", "🔮", "🌠", "❤️", "🎭", "🎁",
 ];
 
+const API_URL = "http://localhost:3001/api";
+
 const Index = () => {
   const now = new Date();
   const isApril = now.getMonth() === 3;
 
-  const allGifts = useMemo(() => getAllGifts(), []);
-  const [spinResults, setSpinResults] = useState<number[]>(getSpinResults);
-  const [lastSpinDate, setLastSpinDate] = useState(getLastSpinDate);
+  const [allGifts, setAllGifts] = useState<Gift[]>([]);
+  const [spinResults, setSpinResults] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [countdown, setCountdown] = useState(getTimeUntilMidnight());
 
+  // Cargar datos del backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [giftsRes, spinsRes] = await Promise.all([
+          fetch(`${API_URL}/gifts`),
+          fetch(`${API_URL}/spins`)
+        ]);
+        const giftsData = await giftsRes.json();
+        const spinsData = await spinsRes.json();
+        
+        setAllGifts(giftsData);
+        setSpinResults(spinsData);
+      } catch (error) {
+        console.error("Error cargando datos del backend:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   const today = getTodayString();
-  const alreadySpunToday = lastSpinDate === today;
   const spinCount = spinResults.length;
+  
+  // Para la lógica de "un giro al día", seguimos usando la fecha del último giro
+  // pero los resultados reales están en el backend
+  const [lastSpinDate, setLastSpinDate] = useState(() => localStorage.getItem(LAST_SPIN_KEY) || "");
+  const alreadySpunToday = lastSpinDate === today;
+  
   const allCompleted = spinCount >= 30;
 
   const availableGifts = useMemo(() => {
@@ -91,14 +120,33 @@ const Index = () => {
 
   const canSpin = isApril ? !alreadySpunToday && availableGifts.length > 0 : availableGifts.length > 0;
 
-  const handleResult = useCallback((gift: Gift) => {
-    const newResults = [...getSpinResults(), gift.id];
-    saveSpinResults(newResults);
-    setSpinResults(newResults);
-    const todayStr = getTodayString();
-    localStorage.setItem(LAST_SPIN_KEY, todayStr);
-    setLastSpinDate(todayStr);
+  const handleResult = useCallback(async (gift: Gift) => {
+    try {
+      const response = await fetch(`${API_URL}/spins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gift_id: gift.id, date: getTodayString() })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSpinResults(prev => [...prev, gift.id]);
+        const todayStr = getTodayString();
+        localStorage.setItem(LAST_SPIN_KEY, todayStr);
+        setLastSpinDate(todayStr);
+      } else {
+        alert(data.error || "¡Vaya! Algo salió mal al guardar tu regalo.");
+      }
+    } catch (error) {
+      console.error("Error guardando giro:", error);
+      alert("No se pudo conectar con el servidor. ¿Está encendido el backend?");
+    }
   }, []);
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Cargando magia...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">

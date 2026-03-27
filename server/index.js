@@ -7,29 +7,33 @@ const app = express();
 const port = process.env.PORT || 3001;
 const db = new Database(path.join(__dirname, 'database.db'));
 
+// Configuración de CORS más robusta
 const allowedOrigins = [
   'http://localhost:8080',
   'http://localhost:5173',
   process.env.FRONTEND_URL
-].filter(Boolean);
+].map(url => url?.replace(/\/$/, "")); // Quita la barra final si existe
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // Permitir si no hay origen (como apps móviles o curl) o si está en la lista
+    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
       callback(null, true);
     } else {
+      console.log("Origen bloqueado por CORS:", origin);
       callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  credentials: true
 }));
+
 app.use(express.json());
 
-// Ruta de estado para confirmar que el back funciona
 app.get('/', (req, res) => {
   res.send('💖 El Backend de Bell está encendido y funcionando perfectamente 💖');
 });
 
-// Inicializar Base de Datos (Sin UNIQUE en date para permitir pruebas)
+// Inicializar Base de Datos
 db.exec(`
   CREATE TABLE IF NOT EXISTS gifts (
     id INTEGER PRIMARY KEY,
@@ -45,6 +49,48 @@ db.exec(`
   );
 `);
 
+// Auto-Seed: Si no hay regalos, insertarlos
+const giftCount = db.prepare('SELECT COUNT(*) as count FROM gifts').get();
+if (giftCount.count === 0) {
+  console.log("Base de datos vacía, insertando regalos iniciales...");
+  const gifts = [
+    { id: 1, title: "¡felipumpe  ! ", message: "feli pumpe a la persona mas bella d este mundo, gachas por tanto eres la mejor del mundo teamo y espero con todo mi corazon k pases un dia muymuy lindo, yo voy a hacer lo posible para k asi sea hoy, este mes y siempre te amooooooo mi bebe 😽♥, la sorpresa d hoy eeeees un misterio, solo t voy a dar una pista cada dia y es k tiene  ver el regalo con straigh kids ", emoji: "🎂" },
+    { id: 2, title: "detallito ", message: "hoy t voy a dar un detalle k hice pensando en ti ojala t guste mucho perdom por tanta helokity mi helokita", emoji: "💌" },
+    { id: 3, title: "t mando un abrazo psicologico hoy, ese es tu regalito d hoy", message: "SJKJASJSAJKASKJ no mentira hoy es algo d comer k recuerda a ti es cmo lo de las nanas, nana si hubieramos sido novias no crees k un abrazo hubiera solucionado tdo", emoji: "😿" },
+    { id: 4, title: "oli pelilinda", message: "sabias k tienes el cabello mas precioso del mundo entonces hoy t doy un regalito para el, ojala t guste mucho muamuamua", emoji: "😊" },
+    { id: 5, title: "fuegooooooooo m kemo d amorxti", message: "algo k encienda la chispa d tu corazon ", emoji: "🔥🔥🔥" },
+    { id: 6, title: "ip ip ip ipip ", message: "oli como tas, hoy toca algo k te va a gustar asi mucho mucho yo se, spoiler es d comer", emoji: "⭐" },
+    { id: 7, title: "majimamshorom mama majimamshorom", message: "psss, toco admitir k blackpink ganó, pero ps k injusticia k hagan comeback al tiempo con twice", emoji: "🖤" },
+    { id: 8, title: "HOLIIIIIIIIIII MIAMOR YA 5MESES", message: "hoy ya 5 meses desde el picnic wao, gachas por estar a mi lado todo este tiempo ti amo muchomucho gracias por aguantarme y animarme los dias con tu presencia, personalidad, y tdooooo tiamo, hoy hay unboxin 🥵", emoji: "😲" },
+    { id: 9, title: "A-B-C, Do-Re-Mi", message: "un pekeño detalle para mi lobita, perdon si uso mucho la k, es k esta dañada en el pc la ku", emoji: "🐺" },
+    { id: 10, title: "사랑해, 꼬마 늑대야", message: "para mi transcoreana fav", emoji: "💖" },
+    { id: 11, title: "7x8", message: "algo pa tucola", emoji: "🌸" },
+    { id: 12, title: "teamo", message: "si t toco este hoy viene el regalo mas bacano k hice solo para ti", emoji: "🥰" },
+    { id: 13, title: "pa k comas", message: "la cutymark de applejack :0, nada  ver el emoji maumauamua", emoji: "🍳" },
+    { id: 14, title: "un petuche", message: "helokito, ya se k mucho hellokito pero es k yo k hago tiamo, despues ya vario mas", emoji: "😻" },
+    { id: 15, title: "wao", message: "🚂🏯⛩️👻🇯🇵🐉🐷", emoji: "🏯" },
+    { id: 16, title: "ñomi", message: "ñomiñomi", emoji: "🥄" },
+    { id: 17, title: "nitenite", message: "para k muermas o no she, cuando viajemos en avion a algun lado de pronto lo usas", emoji: "🌙" },
+    { id: 18, title: "pinpinpin pinpin pinpinpin pinpin ", message: "gatopezconejoratacartera", emoji: "😾" },
+    { id: 19, title: "mama cierto k la abuela wako tiene sangre coriana", message: "española🗣🗣🗣", emoji: "🇪🇸" },
+    { id: 20, title: "hoy toco armarlo", message: "o m ayudas si algo de pronto tu sabes mas o nose, tiamo", emoji: "💎" },
+    { id: 21, title: "jenlisa tuy yo", message: "cual somos, solo puedes decir uno, winrina, jenlisa o hyunming", emoji: "👀" },
+    { id: 22, title: "han", message: "산을 넘어, 산 넘어 강을 넘어, 강 넘어산을 넘어, 산맥 강을 넘어 바다 다 넘어가 또 다음", emoji: "😛" },
+    { id: 23, title: "mi chocolatito tiamo", message: "un chocolatito para otro", emoji: "🍫" },
+    { id: 24, title: "mezcle dos d tus cosas favoritas jijiji", message: "te amo mi minecraftera fav y mas pro y mas crack makina fiera bestia mastodonte", emoji: "👾" },
+    { id: 25, title: "piña para laniña", message: "piña, no hay mas misterio hoy", emoji: "🍍" },
+    { id: 26, title: "par d pepas helokitas", message: "este esta mas facil k el otro", emoji: "😴" },
+    { id: 27, title: "le guta lo kinkinasti aunk sea fancy", message: "sangre mi brazo en partes, soy fiel a mi cora ese es mi martir, si me traicionan le hago plaplapla", emoji: "🍥" },
+    { id: 28, title: "yo", message: "Birds of a feather, we should stick together, I know I said I'd never think I wasn't better alone", emoji: "🔵" },
+    { id: 29, title: "boblox?", message: "niña rata tamo", emoji: "🎭" },
+    { id: 30, title: "🎁", message: "lit", emoji: "🎁" },
+  ];
+  const insert = db.prepare('INSERT INTO gifts (id, title, message, emoji) VALUES (@id, @title, @message, @emoji)');
+  db.transaction((data) => {
+    for (const gift of data) insert.run(gift);
+  })(gifts);
+}
+
 app.get('/api/gifts', (req, res) => {
   const gifts = db.prepare('SELECT * FROM gifts').all();
   res.json(gifts);
@@ -57,15 +103,11 @@ app.get('/api/spins', (req, res) => {
 
 app.post('/api/spins', (req, res) => {
   const { gift_id, date } = req.body;
-  console.log(`Intentando guardar giro: Gift ID ${gift_id} para la fecha ${date}`);
-  
   try {
     const stmt = db.prepare('INSERT INTO spins (gift_id, date) VALUES (?, ?)');
     stmt.run(gift_id, date);
-    console.log("¡Giro guardado con éxito!");
     res.json({ success: true });
   } catch (error) {
-    console.error("Error en la DB:", error.message);
     res.status(400).json({ error: error.message });
   }
 });

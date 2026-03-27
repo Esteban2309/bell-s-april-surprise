@@ -7,28 +7,16 @@ const app = express();
 const port = process.env.PORT || 3001;
 const db = new Database(path.join(__dirname, 'database.db'));
 
-// Configuración de CORS más robusta
-const allowedOrigins = [
-  'http://localhost:8080',
-  'http://localhost:5173',
-  process.env.FRONTEND_URL
-].map(url => url?.replace(/\/$/, "")); // Quita la barra final si existe
-
+// CORS ULTRA-PERMISIVO (Para que funcione sí o sí)
 app.use(cors({
-  origin: function (origin, callback) {
-    // Permitir si no hay origen (como apps móviles o curl) o si está en la lista
-    if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
-      callback(null, true);
-    } else {
-      console.log("Origen bloqueado por CORS:", origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
 
+// Ruta de estado
 app.get('/', (req, res) => {
   res.send('💖 El Backend de Bell está encendido y funcionando perfectamente 💖');
 });
@@ -52,7 +40,6 @@ db.exec(`
 // Auto-Seed: Si no hay regalos, insertarlos
 const giftCount = db.prepare('SELECT COUNT(*) as count FROM gifts').get();
 if (giftCount.count === 0) {
-  console.log("Base de datos vacía, insertando regalos iniciales...");
   const gifts = [
     { id: 1, title: "¡felipumpe  ! ", message: "feli pumpe a la persona mas bella d este mundo, gachas por tanto eres la mejor del mundo teamo y espero con todo mi corazon k pases un dia muymuy lindo, yo voy a hacer lo posible para k asi sea hoy, este mes y siempre te amooooooo mi bebe 😽♥, la sorpresa d hoy eeeees un misterio, solo t voy a dar una pista cada dia y es k tiene  ver el regalo con straigh kids ", emoji: "🎂" },
     { id: 2, title: "detallito ", message: "hoy t voy a dar un detalle k hice pensando en ti ojala t guste mucho perdom por tanta helokity mi helokita", emoji: "💌" },
@@ -75,7 +62,7 @@ if (giftCount.count === 0) {
     { id: 19, title: "mama cierto k la abuela wako tiene sangre coriana", message: "española🗣🗣🗣", emoji: "🇪🇸" },
     { id: 20, title: "hoy toco armarlo", message: "o m ayudas si algo de pronto tu sabes mas o nose, tiamo", emoji: "💎" },
     { id: 21, title: "jenlisa tuy yo", message: "cual somos, solo puedes decir uno, winrina, jenlisa o hyunming", emoji: "👀" },
-    { id: 22, title: "han", message: "산을 넘어, 산 넘어 강을 넘어, 강 넘어산을 넘어, 산맥 강을 넘어 바다 다 넘어가 또 다음", emoji: "😛" },
+    { id: 22, title: "han", message: "산을 넘어, 산 넘어 강을 넘어, 강 넘어산을 넘어, 산맥 강을 넘어 바da 다 넘어가 또 다음", emoji: "😛" },
     { id: 23, title: "mi chocolatito tiamo", message: "un chocolatito para otro", emoji: "🍫" },
     { id: 24, title: "mezcle dos d tus cosas favoritas jijiji", message: "te amo mi minecraftera fav y mas pro y mas crack makina fiera bestia mastodonte", emoji: "👾" },
     { id: 25, title: "piña para laniña", message: "piña, no hay mas misterio hoy", emoji: "🍍" },
@@ -112,6 +99,6 @@ app.post('/api/spins', (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Backend de Bell corriendo en http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Backend de Bell corriendo en puerto ${port}`);
 });

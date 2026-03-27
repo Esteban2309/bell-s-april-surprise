@@ -32,8 +32,8 @@ app.get('/api/gifts', (req, res) => {
 });
 
 app.get('/api/spins', (req, res) => {
-  const spins = db.prepare('SELECT gift_id FROM spins').all();
-  res.json(spins.map(s => s.gift_id));
+  const spins = db.prepare('SELECT gift_id, date FROM spins').all();
+  res.json(spins);
 });
 
 app.post('/api/spins', (req, res) => {

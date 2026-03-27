@@ -7,20 +7,12 @@ import { Bell, User, Sparkles, Home, Calendar, Gift as GiftIcon, Lock } from "lu
 const STORAGE_KEY = "bell-april-spins";
 const LAST_SPIN_KEY = "bell-april-last-spin-date";
 
-function getSpinResults(): number[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveSpinResults(results: number[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
-}
-
 function getLastSpinDate(): string {
-  return localStorage.getItem(LAST_SPIN_KEY) || "";
+  try {
+    return localStorage?.getItem(LAST_SPIN_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 
 function getTodayString(): string {
@@ -42,7 +34,6 @@ function getTimeUntilMidnight() {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-// Floating emojis that appear progressively as more gifts are unlocked
 const ALL_FLOATING_EMOJIS = [
   "🌸", "💗", "✨", "🎀", "⭐", "🦋", "🌙", "💎", "🐱", "🎵",
   "🌷", "💌", "🎪", "👑", "🕊️", "🌿", "💜", "🎶", "🌺", "🧸",
@@ -51,28 +42,46 @@ const ALL_FLOATING_EMOJIS = [
 
 const API_URL = "http://localhost:3001/api";
 
+interface Spin {
+  gift_id: number;
+  date: string;
+}
+
 const Index = () => {
   const now = new Date();
   const isApril = now.getMonth() === 3;
 
-  const [allGifts, setAllGifts] = useState<Gift[]>([]);
-  const [spinResults, setSpinResults] = useState<number[]>([]);
+  const [allGifts, setAllGifts] = useState<Gift[]>(getAllGifts());
+  const [spins, setSpins] = useState<Spin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [countdown, setCountdown] = useState(getTimeUntilMidnight());
 
-  // Cargar datos del backend
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [giftsRes, spinsRes] = await Promise.all([
-          fetch(`${API_URL}/gifts`),
-          fetch(`${API_URL}/spins`)
+          fetch(`${API_URL}/gifts`).catch(() => ({ ok: false, json: () => [] })),
+          fetch(`${API_URL}/spins`).catch(() => ({ ok: false, json: () => [] }))
         ]);
-        const giftsData = await giftsRes.json();
-        const spinsData = await spinsRes.json();
         
-        setAllGifts(giftsData);
-        setSpinResults(spinsData);
+        let giftsData = [];
+        let spinsData = [];
+
+        if ('ok' in giftsRes && giftsRes.ok) {
+          giftsData = await giftsRes.json();
+        }
+        
+        if ('ok' in spinsRes && spinsRes.ok) {
+          spinsData = await spinsRes.json();
+        }
+        
+        if (Array.isArray(giftsData) && giftsData.length > 0) {
+          setAllGifts(giftsData);
+        }
+        
+        if (Array.isArray(spinsData)) {
+          setSpins(spinsData);
+        }
       } catch (error) {
         console.error("Error cargando datos del backend:", error);
       } finally {
@@ -83,59 +92,78 @@ const Index = () => {
   }, []);
 
   const today = getTodayString();
-  const spinCount = spinResults.length;
+  const spinCount = Array.isArray(spins) ? spins.length : 0;
+  const nextSpinNumber = spinCount + 1;
   
-  // Para la lógica de "un giro al día", seguimos usando la fecha del último giro
-  // pero los resultados reales están en el backend
-  const [lastSpinDate, setLastSpinDate] = useState(() => localStorage.getItem(LAST_SPIN_KEY) || "");
-  const alreadySpunToday = lastSpinDate === today;
+  const lastLocalSpin = getLastSpinDate();
+  const hasSpunInBackendToday = Array.isArray(spins) && spins.some(s => s.date === today);
+  const alreadySpunToday = hasSpunInBackendToday || lastLocalSpin === today;
   
   const allCompleted = spinCount >= 30;
 
-  const availableGifts = useMemo(() => {
-    return allGifts.filter((g) => !spinResults.includes(g.id));
-  }, [allGifts, spinResults]);
+  const spinResultsIds = useMemo(() => {
+    return Array.isArray(spins) ? spins.map(s => s.gift_id) : [];
+  }, [spins]);
 
-  const nextSpinNumber = spinCount + 1;
+  const availableGifts = useMemo(() => {
+    return allGifts.filter((g) => {
+      if (spinResultsIds.includes(g.id)) return false;
+      if (g.id === 1 && nextSpinNumber !== 1) return false;
+      if (g.id === 8 && nextSpinNumber !== 8) return false;
+      if ((nextSpinNumber === 1 || nextSpinNumber === 8) && g.id !== nextSpinNumber) return false;
+      return true;
+    });
+  }, [allGifts, spinResultsIds, nextSpinNumber]);
+
   let forcedGiftId: number | null = null;
   if (nextSpinNumber === 1) forcedGiftId = 1;
   else if (nextSpinNumber === 8) forcedGiftId = 8;
 
-  const wonGifts = useMemo(() => {
-    return spinResults.map((id) => allGifts.find((g) => g.id === id)!).filter(Boolean);
-  }, [spinResults, allGifts]);
+  const wonGiftsByDay = useMemo(() => {
+    const map: Record<number, Gift> = {};
+    if (Array.isArray(spins)) {
+      spins.forEach((s, index) => {
+        const gift = allGifts.find((g) => g.id === s.gift_id);
+        if (gift) {
+          map[index + 1] = gift;
+        }
+      });
+    }
+    return map;
+  }, [spins, allGifts]);
 
-  // How many floating emojis to show based on progress
   const floatingEmojis = useMemo(() => {
-    const count = Math.min(Math.ceil(spinCount * 1), ALL_FLOATING_EMOJIS.length);
+    const count = Math.min(Math.floor((spinCount / 30) * ALL_FLOATING_EMOJIS.length) + 5, ALL_FLOATING_EMOJIS.length);
     return ALL_FLOATING_EMOJIS.slice(0, count);
   }, [spinCount]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
       setCountdown(getTimeUntilMidnight());
     }, 1000);
-    return () => clearInterval(interval);
+    return () => clearInterval(timer);
   }, []);
 
   const canSpin = isApril ? !alreadySpunToday && availableGifts.length > 0 : availableGifts.length > 0;
 
   const handleResult = useCallback(async (gift: Gift) => {
+    const todayStr = getTodayString();
     try {
       const response = await fetch(`${API_URL}/spins`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gift_id: gift.id, date: getTodayString() })
+        body: JSON.stringify({ gift_id: gift.id, date: todayStr })
       });
 
-      const data = await response.json();
-
       if (response.ok) {
-        setSpinResults(prev => [...prev, gift.id]);
-        const todayStr = getTodayString();
-        localStorage.setItem(LAST_SPIN_KEY, todayStr);
-        setLastSpinDate(todayStr);
+        setSpins(prev => [...prev, { gift_id: gift.id, date: todayStr }]);
+        try {
+          localStorage.setItem(LAST_SPIN_KEY, todayStr);
+        } catch (e) {
+          console.error("Could not save to localStorage", e);
+        }
       } else {
+        const data = await response.json();
         alert(data.error || "¡Vaya! Algo salió mal al guardar tu regalo.");
       }
     } catch (error) {
@@ -150,13 +178,11 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background pattern */}
       <div
-        className="fixed inset-0 opacity-[0.03] pointer-events-none"
+        className="fixed inset-0 opacity-[0.1] pointer-events-none"
         style={{ backgroundImage: `url(${patternBg})`, backgroundSize: "200px" }}
       />
 
-      {/* Floating emojis background - more appear as gifts are unlocked */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {floatingEmojis.map((emoji, i) => {
           const seed1 = ((i * 7 + 3) % 100);
@@ -182,7 +208,6 @@ const Index = () => {
         })}
       </div>
 
-      {/* Navbar */}
       <nav className="relative z-20 flex items-center justify-between px-6 py-4 border-b border-border/50">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
@@ -201,24 +226,22 @@ const Index = () => {
       </nav>
 
       <div className="relative z-10 container max-w-5xl mx-auto px-4 py-8 sm:py-10">
-        {/* Header with countdown */}
         <div className="flex flex-col sm:flex-row items-start justify-between mb-10 gap-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-accent-foreground" />
               <span className="text-xs font-bold tracking-[0.15em] uppercase text-accent-foreground">
-                Studio Ghibli x SKZ Energy
+                HOLIMIAMOR TEAMO XOMOTAS
               </span>
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold text-foreground mb-2">
-              ¡Feliz Abril, Bell!
+              ¡feliz mes mi belli tiamo!
             </h1>
             <p className="text-sm text-muted-foreground">
-              Un mes mágico lleno de sorpresas y polvo de estrellas.
+              el mejor mes d todo el mundo mundial.
             </p>
           </div>
 
-          {/* Countdown box */}
           {!allCompleted && (
             <div className="rounded-xl border border-primary/30 bg-card px-6 py-4 text-center shrink-0">
               <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground mb-2">
@@ -244,7 +267,6 @@ const Index = () => {
           )}
         </div>
 
-        {/* ALL COMPLETED - Final Message */}
         {allCompleted ? (
           <div className="flex flex-col items-center text-center mb-12 animate-reveal">
             <div className="relative mb-6">
@@ -252,26 +274,25 @@ const Index = () => {
               <div className="relative text-8xl sm:text-9xl">💝</div>
             </div>
             <h2 className="font-script text-5xl sm:text-7xl text-primary mb-4">
-              ¡Lo lograste, Bell!
+              ¡se logro mi corazom d melon!
             </h2>
             <div className="max-w-lg rounded-2xl border-2 border-primary/40 bg-card/80 backdrop-blur-sm p-8 space-y-4">
               <p className="text-foreground text-base leading-relaxed">
-                Abriste los <span className="text-primary font-bold">30 regalos</span> y cada uno fue un pedacito de todo lo que siento por ti.
+                abriste los <span className="text-primary font-bold">30 regalos</span> y cada uno fue un pedacito de todo lo k pense en ti.
               </p>
               <p className="text-foreground/80 text-sm leading-relaxed">
-                Este mes fue mágico porque existes tú. Cada estrella, cada canción, cada palabra… todo fue real, todo fue para ti. 
-                Gracias por ser la persona más increíble que conozco. 💕
+                este mes fue mágico porque existes tú y tu eres la k hace k todo sea mas bonito cada dia. cada estrella, cada canción, cada palabra… todo m recuerda lo feliz k me haces cada dia y espero k yo tmb pueda hacerte asi de feliz. 
+                gracias por ser la persona más increíble que conozco t Amo. ◑﹏◐ヾ(≧▽≦*)o
               </p>
               <p className="text-foreground text-base leading-relaxed font-semibold">
-                Abril se acaba, pero lo nuestro no tiene fecha de caducidad. 
-                <span className="text-primary"> Te amo, Bell.</span> Hoy, mañana y siempre. 🎀
+                abril se acabó, pero eso no kiere decir k no voy a kerer sorprenderte y hacerte feliz cada dia de mi vida. 
+                <span className="text-primary"> t amo mi bebe.</span> hoy, mañana y siempre.muamuamua (´▽`ʃ♡ƪ)
               </p>
               <div className="flex items-center justify-center gap-2 pt-2 text-2xl">
                 🌸 💗 ✨ 🐱 🎵 🦋 🌙 💎
               </div>
             </div>
 
-            {/* Celebration sparkles */}
             <div className="flex gap-3 mt-6">
               {["🎀", "⭐", "💕", "✨", "🌸"].map((e, i) => (
                 <span
@@ -285,9 +306,7 @@ const Index = () => {
             </div>
           </div>
         ) : (
-          /* Wheel Section */
           <div className="relative flex flex-col items-center mb-12">
-            {/* Decorative icons */}
             <div className="absolute left-0 sm:left-10 top-10 text-3xl opacity-80 select-none">🐵</div>
             <div className="absolute right-0 sm:right-10 top-10 text-3xl opacity-80 select-none">🐱</div>
             <div className="absolute right-4 sm:right-16 bottom-10 text-3xl opacity-80 select-none">🎸</div>
@@ -299,26 +318,24 @@ const Index = () => {
               disabled={isApril ? !canSpin : false}
             />
 
-            {/* Status line */}
             <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 ⏳ {canSpin ? "1 giro disponible" : "0 giros disponibles"}
               </span>
               <span className="text-border">|</span>
               <span className="flex items-center gap-1">
-                🏅 Rank: Wolf Chan
+                tiamo
               </span>
             </div>
 
             {!isApril && (
               <p className="text-[10px] text-muted-foreground mt-2">
-                Vista previa — puedes girar sin límite para probar ✨
+                puedes girar solo una vez al dia ✨                
               </p>
             )}
           </div>
         )}
 
-        {/* Gift History */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -331,7 +348,8 @@ const Index = () => {
 
           <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin">
             {Array.from({ length: 30 }, (_, i) => {
-              const giftWon = wonGifts[i];
+              const day = i + 1;
+              const giftWon = wonGiftsByDay[day];
               const isUnlocked = !!giftWon;
 
               return (
@@ -343,7 +361,6 @@ const Index = () => {
                       : "border-2 border-dashed border-border bg-card/50"
                   }`}
                 >
-                  {/* Date tag */}
                   <div
                     className={`text-[10px] font-bold tracking-wider px-2 py-0.5 rounded mb-3 uppercase ${
                       isUnlocked
@@ -351,7 +368,7 @@ const Index = () => {
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    Abr {String(i + 1).padStart(2, "0")}
+                    Abr {String(day).padStart(2, "0")}
                   </div>
 
                   {isUnlocked ? (
@@ -377,7 +394,6 @@ const Index = () => {
             })}
           </div>
 
-          {/* Progress bar */}
           <div className="w-full h-1 rounded-full bg-muted mt-2 overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all duration-500"
@@ -386,7 +402,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Footer */}
         <footer className="text-center pt-6 pb-4 border-t border-border/30">
           <div className="flex items-center justify-center gap-6 mb-3 text-muted-foreground">
             <Home className="w-5 h-5 hover:text-primary transition-colors cursor-pointer" />
@@ -394,7 +409,7 @@ const Index = () => {
             <GiftIcon className="w-5 h-5 hover:text-primary transition-colors cursor-pointer" />
           </div>
           <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em]">
-            © 2026 Bell's April Surprises • Designed with magic
+            © 2026 te amomibelli • hecho con mucho amor xti
           </p>
         </footer>
       </div>

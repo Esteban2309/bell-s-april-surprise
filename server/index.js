@@ -24,6 +24,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Ruta de estado para confirmar que el back funciona
+app.get('/', (req, res) => {
+  res.send('💖 El Backend de Bell está encendido y funcionando perfectamente 💖');
+});
+
 // Inicializar Base de Datos (Sin UNIQUE en date para permitir pruebas)
 db.exec(`
   CREATE TABLE IF NOT EXISTS gifts (
